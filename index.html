@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title></title>
+	</head>
+	<body>
+		<div id="app">
+			<span>{{text}}</span>
+		</div>
+		<script>
+			function compile (node, vm) {
+				//元素节点
+				if(node.nodeType == 1){
+					var k ;
+					if(k = node.firstChild){
+						compile(k, vm);
+					}
+					var attr = node.getAttribute('v-model');
+					
+					if(attr) {
+						var watcher = new Watcher(node, attr, vm, 1);
+					}
+				}
+				//文本节点
+				else if(node.nodeType == 3){
+					var reg = /\{\{(.*?)\}\}/;
+					var arr = [];
+					if(reg.test(node.nodeValue)){
+//						console.log(RegExp);
+						var watcher = new Watcher(node, node.nodeValue.match(reg)[1], vm,3);
+						
+					}
+				}
+			}
+			
+			function Watcher(node, prop, vm, nodeType){
+				Dep.currentTarget = this;
+				
+				this.get = function(){
+					this.value = vm.data[prop];
+				}
+				this.update = function(){
+					this.get();
+					if(nodeType == 1){
+						node.value = this.value;
+					}
+					else if(nodeType == 3){
+						node.nodeValue = this.value;
+					}
+				}
+				this.get();
+				this.update();
+				Dep.currentTarget = null;
+			}
+			
+			function nodeToFragment (node, vm) {
+				var flag = document.createDocumentFragment(node)
+				var child;
+				while(child = node.firstChild){
+					compile(child, vm);
+					flag.appendChild(child);
+				}
+				return flag;
+			}
+			
+			function observe(data) {
+				if(!data || typeof data !== 'object') {
+					return;
+				}
+				Object.keys(data).forEach(function(key){
+					defineReactive(data, key, data[key])
+				})
+			}
+			
+			function defineReactive(obj, key, value){
+				var dep = new Dep();
+				
+				Object.defineProperty(obj, key, {
+					get: function(){
+						if(Dep.currentTarget){
+							dep.addSubs(Dep.currentTarget)
+						}
+						return value;
+					},
+					set: function(newValue){
+						if(value == newValue){
+							return;
+						}
+						value= newValue;
+						dep.notify();
+					}
+				})
+			}
+			
+			function Dep(){
+				this.subs = [];
+			}
+			Dep.prototype = {
+				addSubs: function(watcher){
+					this.subs.push(watcher)
+				},
+				notify: function(){
+					this.subs.forEach(function(v,i){
+						v.update();
+					})
+				}
+			}
+			
+			function Vue(options){
+				this.data = options.data;
+				var id = options.el;
+				//劫持监听所有属性
+				observe(this.data, this);
+				var dom = nodeToFragment(document.getElementById(id), this);
+				//将dom添加到#app中
+				document.getElementById(id).appendChild(dom);
+			}
+			var vm = new Vue({
+				el: 'app',
+				data: {
+					text: 'hello world'
+				}
+			})
+		</script>
+	</body>
+</html>
